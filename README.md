@@ -18,7 +18,7 @@ An offline-first educational workbench for seeing physical randomness become a B
 ## What this project demonstrates
 
 - Recording physical entropy from fair coin flips, six-sided dice, or cards drawn without replacement.
-- Generating 128-bit or 256-bit entropy with the browser CSPRNG for demonstrations.
+- Generating CSPRNG-backed coin flips, unbiased dice rolls, shuffled cards, or exact-size Hex for demonstrations.
 - Estimating source entropy without pretending that hashing adds randomness.
 - Converting entropy into BIP39 checksum bits, 11-bit indexes, and 12/24 recovery words.
 - Completing an 11- or 23-word partial phrase by securely selecting one valid final word.
@@ -81,13 +81,20 @@ For a workshop, copy only that generated HTML file to the presentation computer.
 
 ## Deterministic input format
 
-Coin, dice, and card transcripts are normalized and domain-separated before hashing:
+Coin and card transcripts are normalized and domain-separated before hashing:
 
 ```text
 entropy-workbench:v1|<source>|<normalized transcript>
 ```
 
-The UTF-8 text is hashed once with SHA-256. A 12-word mnemonic uses the first 128 digest bits; a 24-word mnemonic uses all 256 bits.
+Dice mode intentionally follows Ian Coleman's fixed-length conversion so the same rolls can be checked in both tools:
+
+1. Normalize the physical faces to digits `1–6`.
+2. Convert every face `6` to the base-6 digit `0`.
+3. Hash that UTF-8 digit string once with SHA-256.
+4. Use the first 128 digest bits for 12 words or all 256 bits for 24 words.
+
+The interface identifies the selected conversion method and keeps the physical transcript separate from the final BIP39 entropy.
 
 In Hex mode:
 
@@ -99,13 +106,20 @@ This transformation is deterministic. It does not rescue predictable, biased, re
 
 ## Independent cross-checking
 
-To compare a disposable test vector with the Ian Coleman BIP39 tool:
+To compare a disposable dice transcript with the Ian Coleman BIP39 tool:
 
-1. Open **Show entropy details**.
-2. Copy the value from **Step B → entropy**.
-3. In the other implementation, enable entropy input and select **Hex**.
-4. Use the same mnemonic length, exact BIP39 passphrase, Bitcoin mainnet, and BIP84 path.
-5. Compare the mnemonic, master fingerprint, account extended key, and first receiving address.
+1. Open **Verify with Ian Coleman** and copy **Dice rolls**.
+2. In Ian Coleman, enable entropy input and select **Dice [1–6]**.
+3. Select the same fixed mnemonic length: 12 or 24 words.
+4. Paste the transcript and compare the mnemonic.
+
+To compare the final BIP39 entropy instead:
+
+1. Copy **BIP39 entropy (Hex)** from the verification accordion or Step B.
+2. In Ian Coleman, select **Hex [0–9A–F]**.
+3. Select **Use Raw Entropy (3 words per 32 bits)**—do not select the fixed-length override.
+4. Paste the hexadecimal value.
+5. Use the same exact BIP39 passphrase, Bitcoin mainnet, and BIP84 path before comparing wallet identity and addresses.
 
 Two matching browser tools are useful for learning, but they are not automatically independent if they share libraries, assumptions, compromised dependencies, or the same unsafe computer.
 

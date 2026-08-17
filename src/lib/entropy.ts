@@ -100,13 +100,25 @@ export function sourceToEntropyHex(
     return digest.slice(0, targetCharacters);
   }
 
-  const canonical = `entropy-workbench:v1|${mode}|${parsed.normalized}`;
-  const digest = bytesToHex(sha256(utf8ToBytes(canonical)));
+  const digest = bytesToHex(sha256(utf8ToBytes(extractorInput(mode, parsed.normalized))));
   return digest.slice(0, targetBits / 4);
 }
 
 export function canonicalInput(mode: EntropyMode, normalized: string) {
   return `entropy-workbench:v1|${mode}|${normalized}`;
+}
+
+/**
+ * Returns the exact UTF-8 text hashed by the physical-source extractor.
+ *
+ * Ian Coleman represents six-sided dice as base-6 digits 0–5, mapping the
+ * physical face 6 to 0 before hashing a fixed-length mnemonic override. Using
+ * the same representation lets a dice transcript be pasted into its Dice
+ * mode and produce the same 12- or 24-word mnemonic.
+ */
+export function extractorInput(mode: EntropyMode, normalized: string) {
+  if (mode === "dice") return normalized.replaceAll("6", "0");
+  return canonicalInput(mode, normalized);
 }
 
 export function generateSecureEntropyHex(targetBits: 128 | 256) {
@@ -116,6 +128,54 @@ export function generateSecureEntropyHex(targetBits: 128 | 256) {
   const bytes = new Uint8Array(targetBits / 8);
   globalThis.crypto.getRandomValues(bytes);
   return bytesToHex(bytes);
+}
+
+function secureRandomIndex(length: number) {
+  if (!Number.isSafeInteger(length) || length <= 0) {
+    throw new Error("Secure generation requires at least one possible value.");
+  }
+  if (!globalThis.crypto?.getRandomValues) {
+    throw new Error("Secure random generation is not available in this browser.");
+  }
+
+  const range = 0x1_0000_0000;
+  const limit = range - (range % length);
+  const random = new Uint32Array(1);
+  do {
+    globalThis.crypto.getRandomValues(random);
+  } while (random[0] >= limit);
+  return random[0] % length;
+}
+
+const CARD_CODES = ["S", "H", "D", "C"].flatMap((suit) =>
+  ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"].map(
+    (rank) => `${rank}${suit}`,
+  ),
+);
+
+/** Generates a CSPRNG-backed transcript in the currently selected notation. */
+export function generateSecureTranscript(
+  mode: EntropyMode,
+  targetBits: 128 | 256,
+) {
+  if (mode === "hex") return generateSecureEntropyHex(targetBits);
+
+  if (mode === "coin") {
+    return Array.from({ length: targetBits }, () => secureRandomIndex(2)).join("");
+  }
+
+  if (mode === "dice") {
+    const count = requiredEvents("dice", targetBits) ?? 0;
+    return Array.from({ length: count }, () => secureRandomIndex(6) + 1).join("");
+  }
+
+  const shuffled = [...CARD_CODES];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const selected = secureRandomIndex(index + 1);
+    [shuffled[index], shuffled[selected]] = [shuffled[selected], shuffled[index]];
+  }
+  const count = requiredEvents("cards", targetBits) ?? shuffled.length;
+  return shuffled.slice(0, count).join(" ");
 }
 
 export function requiredEvents(mode: EntropyMode, targetBits: 128 | 256) {

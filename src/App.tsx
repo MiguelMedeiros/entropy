@@ -47,8 +47,9 @@ import {
 } from "./lib/crypto";
 import {
   canonicalInput,
+  extractorInput,
   formatCrackTime,
-  generateSecureEntropyHex,
+  generateSecureTranscript,
   parseEntropy,
   requiredEvents,
   sourceToEntropyHex,
@@ -417,9 +418,8 @@ function App() {
 
   const generateAutomaticEntropy = () => {
     try {
-      const generated = generateSecureEntropyHex(targetBits);
-      setInputs((current) => ({ ...current, hex: generated }));
-      setMode("hex");
+      const generated = generateSecureTranscript(mode, targetBits);
+      setInputs((current) => ({ ...current, [mode]: generated }));
       setRandomError(null);
     } catch (error) {
       setRandomError(error instanceof Error ? error.message : "Secure random generation failed.");
@@ -457,6 +457,22 @@ function App() {
 
   const eventUnit = mode === "hex" ? "characters" : mode === "cards" ? "unique cards" : mode === "coin" ? "flips" : "rolls";
   const remaining = needed === null ? null : Math.max(0, needed - parsed.events.length);
+  const transcriptCopyLabel = mode === "dice"
+    ? "Copy dice rolls"
+    : mode === "coin"
+      ? "Copy coin flips"
+      : mode === "cards"
+        ? "Copy card transcript"
+        : "Copy Hex input";
+  const automaticGenerationSummary = mode === "coin"
+    ? `${targetBits} simulated fair coin flips · CSPRNG`
+    : mode === "dice"
+      ? `${needed} simulated fair dice rolls · CSPRNG`
+      : mode === "cards"
+        ? needed === null
+          ? "One complete 52-card shuffle · maximum ≈225.6 bits"
+          : `${needed} cards drawn from one secure shuffle`
+        : `${targetBits} cryptographically secure random bits`;
 
   if (showBackup && details && passphraseMatches) {
     return (
@@ -563,14 +579,6 @@ function App() {
               </div>
             </div>
 
-            <Button variant="accent" className="mb-2 w-full" onClick={generateAutomaticEntropy}>
-              <Sparkles className="size-4" /> Generate automatically
-            </Button>
-            <p className="mb-5 text-center text-[10px] leading-4 text-muted">
-              Browser CSPRNG · {targetBits} bits · generated entirely offline
-            </p>
-            {randomError && <p className="mb-4 rounded-lg bg-danger/[0.06] px-3 py-2 text-xs text-danger">{randomError}</p>}
-
             <Tabs value={mode} onValueChange={(value) => setMode(value as EntropyMode)} className="space-y-4">
               <TabsList className="grid w-full grid-cols-4">
                 {(Object.keys(MODE_META) as EntropyMode[]).map((key) => {
@@ -579,31 +587,59 @@ function App() {
                     <TabsTrigger key={key} value={key} aria-label={MODE_META[key].label} className="px-1 sm:px-2">
                       <Icon className="size-4" />
                       <span className="hidden sm:inline">{MODE_META[key].label}</span>
+                      {inputs[key] && <span className="size-1.5 rounded-full bg-success" aria-label="Saved transcript" />}
                     </TabsTrigger>
                   );
                 })}
               </TabsList>
+
+              <div>
+                <Button variant="accent" className="mb-2 w-full" onClick={generateAutomaticEntropy}>
+                  <Sparkles className="size-4" /> Generate {MODE_META[mode].label.toLowerCase()} automatically
+                </Button>
+                <p className="text-center text-[10px] leading-4 text-muted">
+                  {automaticGenerationSummary} · generated entirely offline
+                </p>
+                <p className="mt-1 text-center text-[10px] leading-4 text-muted">
+                  Each source tab keeps its own transcript.
+                </p>
+              </div>
+              {randomError && <p className="rounded-lg bg-danger/[0.06] px-3 py-2 text-xs text-danger">{randomError}</p>}
 
               <div className="space-y-3">
                 <p className="min-h-5 text-xs leading-5 text-muted">{MODE_META[mode].hint}</p>
                 <EntropyControls mode={mode} raw={raw} onChange={updateRaw} />
                 <div className="flex items-center justify-between gap-3 px-1">
                   <span className="text-[10px] leading-4 text-muted">
-                    Copies the normalized input used by the calculation.
+                    Copies the recorded source transcript, not the final BIP39 entropy.
                   </span>
                   <Button
                     variant="quiet"
                     size="sm"
                     disabled={!parsed.normalized}
-                    onClick={() => handleCopy(parsed.normalized, "raw-entropy")}
+                    onClick={() => handleCopy(parsed.normalized, "source-transcript")}
                   >
-                    {copied === "raw-entropy" ? (
+                    {copied === "source-transcript" ? (
                       <Check className="size-3.5 text-success" />
                     ) : (
                       <Clipboard className="size-3.5" />
                     )}
-                    {copied === "raw-entropy" ? "Copied" : "Copy raw entropy"}
+                    {copied === "source-transcript" ? "Copied" : transcriptCopyLabel}
                   </Button>
+                </div>
+                <div className={cn(
+                  "flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[11px] leading-5",
+                  mode === "dice" ? "border-success/20 bg-success/[0.055] text-success" : "border-line bg-surface/45 text-muted",
+                )}>
+                  {mode === "dice" ? <ShieldCheck className="mt-0.5 size-3.5 shrink-0" /> : <Binary className="mt-0.5 size-3.5 shrink-0" />}
+                  <span>
+                    <strong className="font-semibold text-ink">Conversion method:</strong>{" "}
+                    {mode === "dice"
+                      ? "Ian Coleman compatible · Dice → base 6 → SHA-256"
+                      : mode === "hex"
+                        ? "Exact BIP39 Hex · oversized input is condensed with SHA-256"
+                        : "Entropy Workbench v1 · source-separated SHA-256"}
+                  </span>
                 </div>
               </div>
             </Tabs>
@@ -653,11 +689,41 @@ function App() {
             </div>
 
             {generatedDetails && (
-              <div className="mt-4 rounded-xl border border-success/20 bg-success/[0.055] p-4">
-                <div className="flex items-center gap-2 text-xs font-bold text-success"><ShieldCheck className="size-4" /> Check in Ian Coleman</div>
-                <p className="mt-2 text-[11px] leading-5 text-muted">Select <strong className="text-ink">Hex</strong>, choose <strong className="text-ink">{generatedDetails.words.length} words</strong>, and paste the final BIP39 entropy — not the raw transcript.</p>
-                <CopyButton value={generatedDetails.entropyHex} id="ian-entropy" copied={copied} onCopy={handleCopy} label="Copy for Ian Coleman" />
-              </div>
+              <Accordion type="single" collapsible className="mt-4 rounded-xl border border-success/20 bg-success/[0.055] px-4">
+                <AccordionItem value="ian-verification" className="border-0">
+                  <AccordionTrigger className="py-3.5 text-xs text-success hover:text-success">
+                    <span className="flex items-center gap-2 font-bold"><ShieldCheck className="size-4" /> Verify with Ian Coleman</span>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="space-y-4 pb-1 text-[11px] leading-5 text-muted">
+                      {mode === "dice" && (
+                        <div>
+                          <div className="font-bold text-ink">Compare the same dice rolls</div>
+                          <ol className="mt-1 list-decimal space-y-0.5 pl-4">
+                            <li>Select <strong className="text-ink">Dice [1–6]</strong>.</li>
+                            <li>Select <strong className="text-ink">{wordCount} words</strong>, not “Use Raw Entropy”.</li>
+                            <li>Paste the exact dice transcript below.</li>
+                          </ol>
+                          <div className="mt-2">
+                            <CopyButton value={parsed.normalized} id="ian-dice-transcript" copied={copied} onCopy={handleCopy} label="Copy dice rolls" />
+                          </div>
+                        </div>
+                      )}
+                      <div className={cn(mode === "dice" && "border-t border-line/70 pt-4")}>
+                        <div className="font-bold text-ink">Compare the final BIP39 entropy</div>
+                        <ol className="mt-1 list-decimal space-y-0.5 pl-4">
+                          <li>Select <strong className="text-ink">Hex [0–9A–F]</strong>.</li>
+                          <li>Select <strong className="text-ink">Use Raw Entropy</strong>.</li>
+                          <li>Paste the final hexadecimal value below.</li>
+                        </ol>
+                        <div className="mt-2">
+                          <CopyButton value={generatedDetails.entropyHex} id="ian-bip39-entropy" copied={copied} onCopy={handleCopy} label="Copy BIP39 entropy (Hex)" />
+                        </div>
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             )}
 
             <Button variant="ghost" size="sm" className="mt-4 w-full text-muted" disabled={!raw} onClick={() => updateRaw("")}>
@@ -776,14 +842,20 @@ function App() {
                                     ? hexIsCondensed
                                       ? "The hexadecimal input is normalized and decoded as raw bytes."
                                       : "Exact-length Hex input is used directly as BIP39 entropy."
-                                    : "The source type and transcript are made explicit so the same input always hashes identically."}
+                                    : mode === "dice"
+                                      ? "Dice faces are normalized. For Ian Coleman compatibility, face 6 becomes the base-6 digit 0 before hashing."
+                                      : "The source type and transcript are made explicit so the same input always hashes identically."}
                               </p>
-                              <div className="sensitive overflow-x-auto rounded-lg bg-ink/[0.055] p-3 font-mono text-[11px] leading-5">
+                              <div className="sensitive whitespace-pre-wrap overflow-x-auto rounded-lg bg-ink/[0.055] p-3 font-mono text-[11px] leading-5">
                                 {workflow === "verify"
                                   ? verifyKind === "hex"
                                     ? verifyInput.toLowerCase().replace(/\s+/g, "")
                                     : details.mnemonic
-                                  : mode === "hex" ? parsed.normalized : canonicalInput(mode, parsed.normalized)}
+                                  : mode === "hex"
+                                    ? parsed.normalized
+                                    : mode === "dice"
+                                      ? `Dice transcript: ${parsed.normalized}\nExtractor input: ${extractorInput(mode, parsed.normalized)}`
+                                      : canonicalInput(mode, parsed.normalized)}
                               </div>
                             </div>
                           </div>
@@ -804,7 +876,9 @@ function App() {
                                     ? hexIsCondensed
                                       ? `SHA-256 condenses all ${parsed.estimatedBits} input bits; the first ${targetBits} bits become the BIP39 entropy.`
                                       : "No extractor is applied when Hex input has the exact BIP39 length."
-                                    : `SHA-256 produces a stable 256-bit digest; the first ${targetBits} bits become the BIP39 entropy.`}
+                                    : mode === "dice"
+                                      ? `SHA-256 hashes the Ian Coleman-compatible base-6 transcript; the first ${targetBits} bits become the BIP39 entropy.`
+                                      : `SHA-256 produces a stable 256-bit digest; the first ${targetBits} bits become the BIP39 entropy.`}
                               </p>
                               <div className="sensitive flex items-center justify-between gap-3 rounded-lg bg-ink/[0.055] p-3">
                                 <code className="min-w-0 break-all text-[11px]">{details.entropyHex}</code>
