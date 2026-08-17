@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --canvas: 42 35% 94%;
+    --ink: 158 14% 15%;
+    --muted: 154 7% 41%;
+    --line: 40 16% 82%;
+    --surface: 45 33% 98%;
+    --accent: 18 65% 48%;
+    --success: 153 44% 34%;
+    --danger: 1 59% 45%;
+    --shadow: 150 12% 15%;
+  }
+
+  .dark {
+    color-scheme: dark;
+    --canvas: 150 12% 8%;
+    --ink: 42 28% 91%;
+    --muted: 145 8% 64%;
+    --line: 150 8% 23%;
+    --surface: 150 10% 12%;
+    --accent: 18 65% 48%;
+    --success: 153 48% 55%;
+    --danger: 1 70% 64%;
+    --shadow: 0 0% 0%;
+  }
+
+  * {
+    @apply border-line;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply min-h-screen bg-canvas font-sans text-ink antialiased;
+    background-image:
+      radial-gradient(circle at 12% 8%, hsla(var(--surface), 0.88), transparent 26rem),
+      linear-gradient(hsla(var(--ink), 0.022) 1px, transparent 1px),
+      linear-gradient(90deg, hsla(var(--ink), 0.022) 1px, transparent 1px);
+    background-size: auto, 24px 24px, 24px 24px;
+  }
+
+  ::selection {
+    background: hsla(var(--accent), 0.2);
+  }
+
+  button,
+  input,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+.backup-page {
+  color-scheme: light;
+  --canvas: 42 35% 94%;
+  --ink: 158 14% 15%;
+  --muted: 154 7% 41%;
+  --line: 40 16% 82%;
+  --surface: 45 33% 98%;
+  --accent: 18 65% 48%;
+  --success: 153 44% 34%;
+  --danger: 1 59% 45%;
+  --shadow: 150 12% 15%;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsla(var(--ink), 0.2) transparent;
+  }
+
+  .privacy-mode .sensitive {
+    filter: blur(8px);
+    pointer-events: none;
+    user-select: none;
+  }
+}
+
+@page {
+  size: A4 portrait;
+  margin: 10mm;
+}
+
+@media print {
+  body {
+    background: white !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .backup-page {
+    min-height: auto !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  .backup-sheet {
+    max-width: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    filter: none !important;
+    pointer-events: auto !important;
+    user-select: auto !important;
+  }
+
+  .sensitive {
+    filter: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
