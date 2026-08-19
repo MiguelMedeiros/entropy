@@ -17,7 +17,7 @@
     "@radix-ui/react-accordion": "1.2.20",
     "@radix-ui/react-tabs": "1.1.12",
     "@radix-ui/react-tooltip": "1.2.7",
-    "@scure/base": "1.2.4",
+    "@scure/base": "2.3.0",
     "@scure/bip32": "1.7.0",
     "@scure/bip39": "1.5.4",
     "@zxcvbn-ts/core": "4.2.0",
