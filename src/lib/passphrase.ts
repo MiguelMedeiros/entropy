@@ -1,7 +1,7 @@
 import { ZxcvbnFactory } from "@zxcvbn-ts/core";
 import { adjacencyGraphs, dictionary as commonDictionary } from "@zxcvbn-ts/language-common";
 import { translations } from "@zxcvbn-ts/language-en";
-import { wordlist } from "@scure/bip39/wordlists/english";
+import { wordlist } from "@scure/bip39/wordlists/english.js";
 
 export interface PassphraseStrength {
   score: 0 | 1 | 2 | 3 | 4;
