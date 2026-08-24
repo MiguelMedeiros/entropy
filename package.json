@@ -8,9 +8,9 @@
     "build": "npm run typecheck && vite build",
     "export": "npm run build",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "node --test tests/*.test.mjs && vitest run src",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
-    "test:watch": "vitest"
+    "test:watch": "vitest src"
   },
   "dependencies": {
     "@noble/hashes": "1.7.1",
