@@ -18,7 +18,7 @@
     "@radix-ui/react-tabs": "1.1.21",
     "@radix-ui/react-tooltip": "1.2.7",
     "@scure/base": "2.3.0",
-    "@scure/bip32": "1.7.0",
+    "@scure/bip32": "2.3.0",
     "@scure/bip39": "2.3.0",
     "@zxcvbn-ts/core": "4.2.0",
     "@zxcvbn-ts/language-common": "4.1.3",
