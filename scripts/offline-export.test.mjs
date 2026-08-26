@@ -62,7 +62,7 @@ function inspectMarkup(html) {
 
     const name = nameMatch[1].toLowerCase();
     const attributesSource = html.slice(start + 1 + nameMatch[0].length, end);
-    tags.push({ name, attributes: parseAttributes(attributesSource) });
+    tags.push({ name, attributes: parseAttributes(attributesSource), start });
     cursor = end + 1;
 
     if (name === "script" || name === "style") {
@@ -177,7 +177,7 @@ function validateOfflineDocument(html) {
     if (policy.size !== requiredDirectives.size || directiveCount !== requiredDirectives.size) failures.add("Content-Security-Policy contains an unexpected or duplicate directive.");
 
     const lowerHtml = html.toLowerCase();
-    const cspPosition = html.indexOf(cspContent);
+    const cspPosition = cspMeta.start;
     const headClosePosition = lowerHtml.indexOf("</head>");
     const firstScriptPosition = lowerHtml.indexOf("<script");
     if (cspPosition === -1 || cspPosition > headClosePosition || (firstScriptPosition !== -1 && cspPosition > firstScriptPosition)) {
@@ -272,7 +272,8 @@ test("dist/index.html has no external runtime resources", () => {
 
 test("offline validation fails closed for unsafe or malformed documents", () => {
   const csp = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; media-src data:; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'; navigate-to 'none'";
-  const baseline = `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="${csp}"><style>${"a".repeat(101)}</style></head><body><div id="root"></div><script>${"x".repeat(1_001)}</script></body></html>`;
+  const cspMetaMarkup = `<meta http-equiv="Content-Security-Policy" content="${csp}">`;
+  const baseline = `<!doctype html><html><head>${cspMetaMarkup}<style>${"a".repeat(101)}</style></head><body><div id="root"></div><script>${"x".repeat(1_001)}</script></body></html>`;
   assert.equal(validateOfflineDocument(baseline).size, 0, "negative fixtures require a passing baseline");
 
   const fixtures = [
@@ -284,6 +285,7 @@ test("offline validation fails closed for unsafe or malformed documents", () => 
     ["literal network call", baseline.replace("<script>", "<script>fetch('https://example.com');"), "network call"],
     ["computed navigation", baseline.replace("<script>", "<script>location.href=['https:', '', 'example.com'].join('/');"), "navigation API"],
     ["duplicate CSP directive", baseline.replace(csp, `connect-src https:; ${csp}`), "unexpected or duplicate"],
+    ["late CSP meta", baseline.replace(cspMetaMarkup, "").replace("</body>", `${cspMetaMarkup}</body>`), "must appear in <head>"],
   ];
 
   for (const [name, fixture, expectedFailure] of fixtures) {
