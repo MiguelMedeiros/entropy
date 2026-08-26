@@ -38,6 +38,14 @@ describe("sensitive reveal transitions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Show passphrase" }));
     fireEvent.click(screen.getByRole("button", { name: "Reveal seed" }));
+    fireEvent.change(screen.getByLabelText("Coins entropy transcript"), {
+      target: { value: `1${"0".repeat(127)}` },
+    });
+    expect(screen.getByLabelText("Optional BIP39 passphrase")).toHaveProperty("type", "password");
+    expect(screen.getByRole("button", { name: "Reveal seed" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show passphrase" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reveal seed" }));
     fireEvent.click(screen.getByRole("button", { name: "Presentation mode" }));
     expect(screen.getByLabelText("Optional BIP39 passphrase")).toHaveProperty("type", "password");
     expect(screen.getByRole("button", { name: "Reveal seed" })).toBeTruthy();
