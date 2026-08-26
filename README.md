@@ -77,6 +77,8 @@ npm run export
 
 The exported application is written to `dist/index.html`. The `dist` directory is intentionally ignored by Git; build it from the reviewed source on the machine where it will be used.
 
+After building, run `npm run test:offline-export` to verify that `dist/index.html` is the only artifact and does not load external runtime resources.
+
 For a workshop, copy only that generated HTML file to the presentation computer. For any exercise involving secrets, use disposable test vectors and a dedicated offline environment—never a funded wallet.
 
 ## Deterministic input format
