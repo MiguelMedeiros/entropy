@@ -7,7 +7,7 @@ const pagesUrl = "https://miguelmedeiros.github.io/entropy/";
 
 test("README links prominently to the live GitHub Pages app", () => {
   const readme = readFileSync(new URL("README.md", root), "utf8");
-  assert.match(readme.slice(0, 1_500), new RegExp(pagesUrl.replaceAll("/", "\\/")));
+  assert.ok(readme.slice(0, 1_500).includes(pagesUrl));
 });
 
 test("Pages workflow builds the verified offline export and deploys only dist", () => {
