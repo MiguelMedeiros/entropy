@@ -152,6 +152,7 @@ function validateOfflineDocument(html) {
     failures.add("Document is missing a Content-Security-Policy meta tag.");
   } else {
     const cspContent = cspMeta.attributes.get("content") ?? "";
+    const directiveCount = cspContent.split(";").map((directive) => directive.trim()).filter(Boolean).length;
     const policy = parseCsp(cspContent);
     const requiredDirectives = new Map([
       ["default-src", ["'none'"]],
@@ -173,7 +174,7 @@ function validateOfflineDocument(html) {
         failures.add(`Content-Security-Policy must contain ${directive} ${expectedSources.join(" ")}.`);
       }
     }
-    if (policy.size !== requiredDirectives.size) failures.add("Content-Security-Policy contains an unexpected or duplicate directive.");
+    if (policy.size !== requiredDirectives.size || directiveCount !== requiredDirectives.size) failures.add("Content-Security-Policy contains an unexpected or duplicate directive.");
 
     const lowerHtml = html.toLowerCase();
     const cspPosition = html.indexOf(cspContent);
@@ -282,6 +283,7 @@ test("offline validation fails closed for unsafe or malformed documents", () => 
     ["meta refresh", baseline.replace("</head>", "<meta http-equiv=\"refresh\" content=\"0;url=https://example.com\"></head>"), "Meta refresh"],
     ["literal network call", baseline.replace("<script>", "<script>fetch('https://example.com');"), "network call"],
     ["computed navigation", baseline.replace("<script>", "<script>location.href=['https:', '', 'example.com'].join('/');"), "navigation API"],
+    ["duplicate CSP directive", baseline.replace(csp, `connect-src https:; ${csp}`), "unexpected or duplicate"],
   ];
 
   for (const [name, fixture, expectedFailure] of fixtures) {
