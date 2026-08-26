@@ -25,15 +25,23 @@ describe("sensitive reveal transitions", () => {
     });
 
     const passphrase = screen.getByLabelText("Optional BIP39 passphrase");
-    const backup = screen.getByRole("button", { name: "Backup sheet" });
     fireEvent.click(screen.getByRole("button", { name: "Show passphrase" }));
     fireEvent.click(screen.getByRole("button", { name: "Reveal seed" }));
     expect(passphrase).toHaveProperty("type", "text");
     expect(screen.getByRole("button", { name: "Hide seed" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Presentation mode" }));
-    expect(passphrase).toHaveProperty("type", "password");
+    fireEvent.click(screen.getByRole("button", { name: "Backup sheet" }));
+    expect(screen.getByRole("heading", { name: "Verify your paper backup" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByLabelText("Optional BIP39 passphrase")).toHaveProperty("type", "password");
     expect(screen.getByRole("button", { name: "Reveal seed" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show passphrase" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reveal seed" }));
+    fireEvent.click(screen.getByRole("button", { name: "Presentation mode" }));
+    expect(screen.getByLabelText("Optional BIP39 passphrase")).toHaveProperty("type", "password");
+    expect(screen.getByRole("button", { name: "Reveal seed" })).toBeTruthy();
+    const backup = screen.getByRole("button", { name: "Backup sheet" });
     expect(backup).toHaveProperty("disabled", true);
 
     fireEvent.click(backup);
@@ -41,11 +49,5 @@ describe("sensitive reveal transitions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Show private data" }));
     expect(backup).toHaveProperty("disabled", false);
-    fireEvent.click(backup);
-    expect(screen.getByRole("heading", { name: "Verify your paper backup" })).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.getByLabelText("Optional BIP39 passphrase")).toHaveProperty("type", "password");
-    expect(screen.getByRole("button", { name: "Reveal seed" })).toBeTruthy();
   });
 });
