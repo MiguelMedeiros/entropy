@@ -126,6 +126,9 @@ test("dist/index.html is the only production artifact", () => {
 function validateOfflineDocument(html) {
   const failures = new Set();
   if (!/^\s*<!doctype html>/i.test(html)) failures.add("Document is missing an HTML doctype.");
+  if (!/^\s*<!doctype html>\s*<html\b[^>]*>\s*<head\b[^>]*>[\s\S]*<\/head>\s*<body\b[^>]*>[\s\S]*<\/body>\s*<\/html>\s*$/i.test(html)) {
+    failures.add("Document must contain one complete html/head/body structure with closing tags.");
+  }
 
   let inspected;
   try {
@@ -143,24 +146,41 @@ function validateOfflineDocument(html) {
   if (!scripts.some((script) => script.trim().length > 1_000)) failures.add("Document is missing a nonempty inline application bundle.");
   if (!css.some((stylesheet) => stylesheet.trim().length > 100)) failures.add("Document is missing a nonempty inline stylesheet.");
 
-  const cspMeta = tags.find(({ name, attributes }) => name === "meta" && attributes.get("http-equiv")?.toLowerCase() === "content-security-policy");
-  if (!cspMeta) {
+  const cspMetas = tags.filter(({ name, attributes }) => name === "meta" && attributes.get("http-equiv")?.toLowerCase() === "content-security-policy");
+  const cspMeta = cspMetas[0];
+  if (!cspMeta || cspMetas.length !== 1) {
     failures.add("Document is missing a Content-Security-Policy meta tag.");
   } else {
-    const policy = parseCsp(cspMeta.attributes.get("content") ?? "");
+    const cspContent = cspMeta.attributes.get("content") ?? "";
+    const policy = parseCsp(cspContent);
     const requiredDirectives = new Map([
       ["default-src", ["'none'"]],
+      ["script-src", ["'unsafe-inline'"]],
+      ["style-src", ["'unsafe-inline'"]],
+      ["img-src", ["data:"]],
+      ["font-src", ["data:"]],
       ["connect-src", ["'none'"]],
+      ["media-src", ["data:"]],
       ["object-src", ["'none'"]],
       ["frame-src", ["'none'"]],
       ["worker-src", ["'none'"]],
       ["base-uri", ["'none'"]],
       ["form-action", ["'none'"]],
+      ["navigate-to", ["'none'"]],
     ]);
     for (const [directive, expectedSources] of requiredDirectives) {
       if (JSON.stringify(policy.get(directive)) !== JSON.stringify(expectedSources)) {
         failures.add(`Content-Security-Policy must contain ${directive} ${expectedSources.join(" ")}.`);
       }
+    }
+    if (policy.size !== requiredDirectives.size) failures.add("Content-Security-Policy contains an unexpected or duplicate directive.");
+
+    const lowerHtml = html.toLowerCase();
+    const cspPosition = html.indexOf(cspContent);
+    const headClosePosition = lowerHtml.indexOf("</head>");
+    const firstScriptPosition = lowerHtml.indexOf("<script");
+    if (cspPosition === -1 || cspPosition > headClosePosition || (firstScriptPosition !== -1 && cspPosition > firstScriptPosition)) {
+      failures.add("Content-Security-Policy must appear in <head> before every script.");
     }
   }
 
@@ -181,6 +201,10 @@ function validateOfflineDocument(html) {
   const urlAttributes = new Set(["action", "cite", "data", "formaction", "href", "manifest", "poster", "src", "srcset", "xlink:href"]);
 
   for (const { name, attributes } of tags) {
+    if (name === "meta" && attributes.get("http-equiv")?.toLowerCase() === "refresh") {
+      failures.add("Meta refresh navigation is not allowed.");
+    }
+
     for (const attribute of resourceAttributes.get(name) ?? []) {
       if (attributes.has(attribute) && !isAllowedEmbeddedResource(name, attribute, attributes.get(attribute))) {
         failures.add(`<${name}> ${attribute}=${JSON.stringify(attributes.get(attribute))} is not embedded`);
@@ -190,6 +214,9 @@ function validateOfflineDocument(html) {
     if (attributes.has("srcdoc")) failures.add(`<${name}> srcdoc can embed executable content`);
 
     for (const [attribute, value] of attributes) {
+      if (name === "a" && attribute === "href" && !decodeUrl(value).startsWith("#")) {
+        failures.add(`<a> href=${JSON.stringify(value)} is not a local fragment`);
+      }
       if (urlAttributes.has(attribute) && isNetworkUrl(value)) {
         failures.add(`<${name}> ${attribute}=${JSON.stringify(value)} is a network URL`);
       }
@@ -228,6 +255,10 @@ function validateOfflineDocument(html) {
         failures.add(`JavaScript block ${index + 1} network call uses ${JSON.stringify(match[2])}`);
       }
     }
+
+    if (/(?:\b(?:window\.)?location(?:\.href)?\s*=(?!=)|\b(?:window\.)?location\.(?:assign|replace)\s*\(|\bwindow\.open\s*\()/i.test(script)) {
+      failures.add(`JavaScript block ${index + 1} contains a navigation API`);
+    }
   }
 
   return failures;
@@ -239,14 +270,22 @@ test("dist/index.html has no external runtime resources", () => {
 });
 
 test("offline validation fails closed for unsafe or malformed documents", () => {
+  const csp = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; media-src data:; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'; navigate-to 'none'";
+  const baseline = `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="${csp}"><style>${"a".repeat(101)}</style></head><body><div id="root"></div><script>${"x".repeat(1_001)}</script></body></html>`;
+  assert.equal(validateOfflineDocument(baseline).size, 0, "negative fixtures require a passing baseline");
+
   const fixtures = [
-    ["empty document", ""],
-    ["unterminated script", "<!doctype html><html><head></head><body><div id=\"root\"></div><script>"],
-    ["executable data iframe", "<!doctype html><html><head></head><body><div id=\"root\"></div><iframe src=\"data:text/html,<script>fetch('https://example.com')</script>\"></iframe></body></html>"],
-    ["literal network call", "<!doctype html><html><head></head><body><div id=\"root\"></div><script>fetch('https://example.com');</script></body></html>"],
+    ["empty document", "", "doctype"],
+    ["unclosed document", baseline.replace("</html>", ""), "complete html/head/body"],
+    ["executable data iframe", baseline.replace("</body>", "<iframe src=\"data:text/html,<script>alert(1)</script>\"></iframe></body>"), "<iframe> src"],
+    ["executable data anchor", baseline.replace("</body>", "<a href=\"data:text/html,<script>alert(1)</script>\">open</a></body>"), "not a local fragment"],
+    ["meta refresh", baseline.replace("</head>", "<meta http-equiv=\"refresh\" content=\"0;url=https://example.com\"></head>"), "Meta refresh"],
+    ["literal network call", baseline.replace("<script>", "<script>fetch('https://example.com');"), "network call"],
+    ["computed navigation", baseline.replace("<script>", "<script>location.href=['https:', '', 'example.com'].join('/');"), "navigation API"],
   ];
 
-  for (const [name, fixture] of fixtures) {
-    assert.notEqual(validateOfflineDocument(fixture).size, 0, `${name} must be rejected`);
+  for (const [name, fixture, expectedFailure] of fixtures) {
+    const failures = [...validateOfflineDocument(fixture)];
+    assert.ok(failures.some((failure) => failure.includes(expectedFailure)), `${name} must be rejected for ${expectedFailure}; got ${failures.join(" | ")}`);
   }
 });
