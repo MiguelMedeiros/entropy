@@ -329,10 +329,9 @@ function App() {
   const [expectedPublicKey, setExpectedPublicKey] = useState("");
   const [passphrase, setPassphrase] = useState("");
   const [passphraseConfirmation, setPassphraseConfirmation] = useState("");
-  const [showPassphrase, setShowPassphrase] = useState(false);
   const [privacyMode, setPrivacyMode] = useState(false);
   const [darkMode, setDarkMode] = useState(() => document.documentElement.classList.contains("dark"));
-  const [{ showSeed, privateKeyIds: revealedPrivateKeys }, dispatchSensitiveReveal] = useReducer(
+  const [{ showPassphrase, showSeed, privateKeyIds: revealedPrivateKeys }, dispatchSensitiveReveal] = useReducer(
     sensitiveRevealReducer,
     undefined,
     createSensitiveRevealState,
@@ -1006,7 +1005,7 @@ function App() {
                       />
                     </label>
                   </div>
-                  <Button variant="ghost" size="sm" className="mt-2" disabled={!details} onClick={() => setShowPassphrase((value) => !value)}>
+                  <Button variant="ghost" size="sm" className="mt-2" disabled={!details} onClick={() => dispatchSensitiveReveal({ type: "toggle-passphrase" })}>
                     {showPassphrase ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                     {showPassphrase ? "Hide passphrase" : "Show passphrase"}
                   </Button>

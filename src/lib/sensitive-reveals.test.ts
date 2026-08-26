@@ -4,14 +4,17 @@ import { createSensitiveRevealState, sensitiveRevealReducer } from "./sensitive-
 describe("sensitive reveal state", () => {
   it("conceals the seed and every private key together", () => {
     let state = createSensitiveRevealState();
+    state = sensitiveRevealReducer(state, { type: "toggle-passphrase" });
     state = sensitiveRevealReducer(state, { type: "toggle-seed" });
     state = sensitiveRevealReducer(state, { type: "toggle-private-key", keyId: "wallet-key" });
 
+    expect(state.showPassphrase).toBe(true);
     expect(state.showSeed).toBe(true);
     expect(state.privateKeyIds.has("wallet-key")).toBe(true);
 
     state = sensitiveRevealReducer(state, { type: "conceal-all" });
 
+    expect(state.showPassphrase).toBe(false);
     expect(state.showSeed).toBe(false);
     expect(state.privateKeyIds.size).toBe(0);
   });

@@ -1,16 +1,18 @@
 export type SensitiveRevealState = {
+  showPassphrase: boolean;
   showSeed: boolean;
   privateKeyIds: ReadonlySet<string>;
 };
 
 export type SensitiveRevealAction =
+  | { type: "toggle-passphrase" }
   | { type: "toggle-seed" }
   | { type: "toggle-private-key"; keyId: string }
   | { type: "clear-private-keys" }
   | { type: "conceal-all" };
 
 export function createSensitiveRevealState(): SensitiveRevealState {
-  return { showSeed: false, privateKeyIds: new Set() };
+  return { showPassphrase: false, showSeed: false, privateKeyIds: new Set() };
 }
 
 export function sensitiveRevealReducer(
@@ -18,6 +20,8 @@ export function sensitiveRevealReducer(
   action: SensitiveRevealAction,
 ): SensitiveRevealState {
   switch (action.type) {
+    case "toggle-passphrase":
+      return { ...state, showPassphrase: !state.showPassphrase };
     case "toggle-seed":
       return { ...state, showSeed: !state.showSeed };
     case "toggle-private-key": {
