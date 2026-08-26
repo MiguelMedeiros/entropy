@@ -3,11 +3,12 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const root = new URL("../", import.meta.url);
-const pagesUrl = "https://miguelmedeiros.github.io/entropy/";
-
 test("README links prominently to the live GitHub Pages app", () => {
   const readme = readFileSync(new URL("README.md", root), "utf8");
-  assert.ok(readme.slice(0, 1_500).includes(pagesUrl));
+  assert.equal(
+    readme.split("\n")[4],
+    "**[Open the live educational demo →](https://miguelmedeiros.github.io/entropy/)**",
+  );
 });
 
 test("Pages workflow builds the verified offline export and deploys only dist", () => {
