@@ -46,7 +46,8 @@ function inspectMarkup(html) {
 
     if (html.startsWith("<!--", start)) {
       const end = html.indexOf("-->", start + 4);
-      cursor = end === -1 ? html.length : end + 3;
+      if (end === -1) throw new Error("Unterminated HTML comment.");
+      cursor = end + 3;
       continue;
     }
 
@@ -57,7 +58,7 @@ function inspectMarkup(html) {
     }
 
     const end = readOpeningTag(html, start + 1);
-    if (end === -1) break;
+    if (end === -1) throw new Error(`Unterminated <${nameMatch[1]}> opening tag.`);
 
     const name = nameMatch[1].toLowerCase();
     const attributesSource = html.slice(start + 1 + nameMatch[0].length, end);
@@ -67,12 +68,13 @@ function inspectMarkup(html) {
     if (name === "script" || name === "style") {
       const closingTag = `</${name}`;
       const closeStart = lowerHtml.indexOf(closingTag, cursor);
-      if (closeStart === -1) break;
+      if (closeStart === -1) throw new Error(`Unterminated <${name}> element.`);
       const contents = html.slice(cursor, closeStart);
       if (name === "style") css.push(contents);
       if (name === "script") scripts.push(contents);
       const closeEnd = html.indexOf(">", closeStart + closingTag.length);
-      cursor = closeEnd === -1 ? html.length : closeEnd + 1;
+      if (closeEnd === -1) throw new Error(`Unterminated </${name}> closing tag.`);
+      cursor = closeEnd + 1;
     }
   }
 
@@ -97,6 +99,21 @@ function isInlineUrl(value) {
   return decoded.startsWith("data:") || decoded.startsWith("#");
 }
 
+function isAllowedEmbeddedResource(tag, attribute, value) {
+  const decoded = decodeUrl(value);
+  if (["img", "source", "audio", "video", "track"].includes(tag)) return decoded.startsWith("data:");
+  if (tag === "image") return decoded.startsWith("data:") || decoded.startsWith("#");
+  if (tag === "use") return decoded.startsWith("#");
+  return false;
+}
+
+function parseCsp(value) {
+  return new Map(value.split(";").map((directive) => directive.trim()).filter(Boolean).map((directive) => {
+    const [name, ...sources] = directive.split(/\s+/);
+    return [name.toLowerCase(), sources];
+  }));
+}
+
 test("dist/index.html is the only production artifact", () => {
   assert.deepEqual(
     readdirSync(distDirectory).sort(),
@@ -106,10 +123,47 @@ test("dist/index.html is the only production artifact", () => {
   assert.equal(statSync(exportFile).isFile(), true, "Expected dist/index.html to be a regular file.");
 });
 
-test("dist/index.html has no external runtime resources", () => {
-  const html = readFileSync(exportFile, "utf8");
-  const { tags, css, scripts } = inspectMarkup(html);
+function validateOfflineDocument(html) {
   const failures = new Set();
+  if (!/^\s*<!doctype html>/i.test(html)) failures.add("Document is missing an HTML doctype.");
+
+  let inspected;
+  try {
+    inspected = inspectMarkup(html);
+  } catch (error) {
+    failures.add(`Document could not be parsed: ${error instanceof Error ? error.message : String(error)}`);
+    return failures;
+  }
+
+  const { tags, css, scripts } = inspected;
+  if (!tags.some(({ name }) => name === "html")) failures.add("Document is missing an <html> element.");
+  if (!tags.some(({ name }) => name === "head")) failures.add("Document is missing a <head> element.");
+  if (!tags.some(({ name }) => name === "body")) failures.add("Document is missing a <body> element.");
+  if (!tags.some(({ attributes }) => attributes.get("id") === "root")) failures.add("Document is missing the application root.");
+  if (!scripts.some((script) => script.trim().length > 1_000)) failures.add("Document is missing a nonempty inline application bundle.");
+  if (!css.some((stylesheet) => stylesheet.trim().length > 100)) failures.add("Document is missing a nonempty inline stylesheet.");
+
+  const cspMeta = tags.find(({ name, attributes }) => name === "meta" && attributes.get("http-equiv")?.toLowerCase() === "content-security-policy");
+  if (!cspMeta) {
+    failures.add("Document is missing a Content-Security-Policy meta tag.");
+  } else {
+    const policy = parseCsp(cspMeta.attributes.get("content") ?? "");
+    const requiredDirectives = new Map([
+      ["default-src", ["'none'"]],
+      ["connect-src", ["'none'"]],
+      ["object-src", ["'none'"]],
+      ["frame-src", ["'none'"]],
+      ["worker-src", ["'none'"]],
+      ["base-uri", ["'none'"]],
+      ["form-action", ["'none'"]],
+    ]);
+    for (const [directive, expectedSources] of requiredDirectives) {
+      if (JSON.stringify(policy.get(directive)) !== JSON.stringify(expectedSources)) {
+        failures.add(`Content-Security-Policy must contain ${directive} ${expectedSources.join(" ")}.`);
+      }
+    }
+  }
+
   const resourceAttributes = new Map([
     ["script", ["src"]],
     ["link", ["href"]],
@@ -128,10 +182,12 @@ test("dist/index.html has no external runtime resources", () => {
 
   for (const { name, attributes } of tags) {
     for (const attribute of resourceAttributes.get(name) ?? []) {
-      if (attributes.has(attribute) && !isInlineUrl(attributes.get(attribute))) {
+      if (attributes.has(attribute) && !isAllowedEmbeddedResource(name, attribute, attributes.get(attribute))) {
         failures.add(`<${name}> ${attribute}=${JSON.stringify(attributes.get(attribute))} is not embedded`);
       }
     }
+
+    if (attributes.has("srcdoc")) failures.add(`<${name}> srcdoc can embed executable content`);
 
     for (const [attribute, value] of attributes) {
       if (urlAttributes.has(attribute) && isNetworkUrl(value)) {
@@ -166,7 +222,7 @@ test("dist/index.html has no external runtime resources", () => {
       }
     }
 
-    const networkCallPattern = /\b(?:fetch|EventSource|WebSocket|sendBeacon)\s*\(\s*(["'`])([^"'`]+)\1/gi;
+    const networkCallPattern = /\b(?:fetch|EventSource|WebSocket|sendBeacon|import|Worker|SharedWorker)\s*\(\s*(["'`])([^"'`]+)\1/gi;
     for (const match of script.matchAll(networkCallPattern)) {
       if (!isInlineUrl(match[2])) {
         failures.add(`JavaScript block ${index + 1} network call uses ${JSON.stringify(match[2])}`);
@@ -174,9 +230,23 @@ test("dist/index.html has no external runtime resources", () => {
     }
   }
 
-  assert.equal(
-    failures.size,
-    0,
-    `Offline export references external runtime resources:\n${[...failures].map((failure) => `- ${failure}`).join("\n")}`,
-  );
+  return failures;
+}
+
+test("dist/index.html has no external runtime resources", () => {
+  const failures = validateOfflineDocument(readFileSync(exportFile, "utf8"));
+  assert.equal(failures.size, 0, `Offline export is not self-contained:\n${[...failures].map((failure) => `- ${failure}`).join("\n")}`);
+});
+
+test("offline validation fails closed for unsafe or malformed documents", () => {
+  const fixtures = [
+    ["empty document", ""],
+    ["unterminated script", "<!doctype html><html><head></head><body><div id=\"root\"></div><script>"],
+    ["executable data iframe", "<!doctype html><html><head></head><body><div id=\"root\"></div><iframe src=\"data:text/html,<script>fetch('https://example.com')</script>\"></iframe></body></html>"],
+    ["literal network call", "<!doctype html><html><head></head><body><div id=\"root\"></div><script>fetch('https://example.com');</script></body></html>"],
+  ];
+
+  for (const [name, fixture] of fixtures) {
+    assert.notEqual(validateOfflineDocument(fixture).size, 0, `${name} must be rejected`);
+  }
 });

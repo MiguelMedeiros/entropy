@@ -29,7 +29,16 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
+
+      - name: Verify registry signatures
+        run: npm audit signatures
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+      - name: Rebuild approved native tooling
+        run: npm rebuild esbuild
 
       - name: Run tests
         run: npm test
@@ -42,9 +51,3 @@ jobs:
 
       - name: Verify offline export
         run: npm run test:offline-export
-
-      - name: Audit dependencies
-        run: npm audit --audit-level=high
-
-      - name: Verify registry signatures
-        run: npm audit signatures
