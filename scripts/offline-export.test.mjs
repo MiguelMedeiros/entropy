@@ -285,7 +285,7 @@ test("offline validation fails closed for unsafe or malformed documents", () => 
     ["literal network call", baseline.replace("<script>", "<script>fetch('https://example.com');"), "network call"],
     ["computed navigation", baseline.replace("<script>", "<script>location.href=['https:', '', 'example.com'].join('/');"), "navigation API"],
     ["duplicate CSP directive", baseline.replace(csp, `connect-src https:; ${csp}`), "unexpected or duplicate"],
-    ["late CSP meta", baseline.replace(cspMetaMarkup, "").replace("</body>", `${cspMetaMarkup}</body>`), "must appear in <head>"],
+    ["late CSP meta", baseline.replace(cspMetaMarkup, `<meta name="csp-decoy" content="${csp}">`).replace("</body>", `${cspMetaMarkup}</body>`), "must appear in <head>"],
   ];
 
   for (const [name, fixture, expectedFailure] of fixtures) {
