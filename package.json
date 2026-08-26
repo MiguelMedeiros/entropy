@@ -9,6 +9,7 @@
     "export": "npm run build",
     "preview": "vite preview",
     "test": "node --test tests/*.test.mjs && vitest run src",
+    "test:offline-export": "node --test scripts/offline-export.test.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
     "test:watch": "vitest src"
   },
@@ -27,12 +28,12 @@
     "clsx": "2.1.1",
     "lucide-react": "1.33.0",
     "react": "19.2.8",
-    "react-dom": "19.1.1",
+    "react-dom": "19.2.8",
     "tailwind-merge": "2.6.0"
   },
   "devDependencies": {
     "@types/react": "19.2.18",
-    "@types/react-dom": "19.1.7",
+    "@types/react-dom": "19.2.5",
     "@vitejs/plugin-react": "4.7.0",
     "autoprefixer": "10.5.4",
     "postcss": "8.5.26",
