@@ -21,7 +21,7 @@ import {
   Sun,
   Undo2,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useReducer, useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -57,6 +57,7 @@ import {
 } from "./lib/entropy";
 import { cn, copyText, truncateMiddle } from "./lib/utils";
 import { estimatePassphraseStrength } from "./lib/passphrase";
+import { createSensitiveRevealState, sensitiveRevealReducer } from "./lib/sensitive-reveals";
 
 const MODE_META = {
   coin: {
@@ -329,10 +330,13 @@ function App() {
   const [passphrase, setPassphrase] = useState("");
   const [passphraseConfirmation, setPassphraseConfirmation] = useState("");
   const [showPassphrase, setShowPassphrase] = useState(false);
-  const [showSeed, setShowSeed] = useState(false);
   const [privacyMode, setPrivacyMode] = useState(false);
   const [darkMode, setDarkMode] = useState(() => document.documentElement.classList.contains("dark"));
-  const [revealedPrivateKeys, setRevealedPrivateKeys] = useState<Set<string>>(() => new Set());
+  const [{ showSeed, privateKeyIds: revealedPrivateKeys }, dispatchSensitiveReveal] = useReducer(
+    sensitiveRevealReducer,
+    undefined,
+    createSensitiveRevealState,
+  );
   const [activeBitChunk, setActiveBitChunk] = useState<number | null>(null);
   const [showBackup, setShowBackup] = useState(false);
   const [randomError, setRandomError] = useState<string | null>(null);
@@ -414,12 +418,18 @@ function App() {
     window.setTimeout(() => setCopied((current) => (current === id ? null : current)), 1_600);
   };
 
-  const updateRaw = (value: string) => setInputs((current) => ({ ...current, [mode]: value }));
+  const concealSensitiveReveals = () => dispatchSensitiveReveal({ type: "conceal-all" });
+
+  const updateRaw = (value: string) => {
+    setInputs((current) => ({ ...current, [mode]: value }));
+    concealSensitiveReveals();
+  };
 
   const generateAutomaticEntropy = () => {
     try {
       const generated = generateSecureTranscript(mode, targetBits);
       setInputs((current) => ({ ...current, [mode]: generated }));
+      concealSensitiveReveals();
       setRandomError(null);
     } catch (error) {
       setRandomError(error instanceof Error ? error.message : "Secure random generation failed.");
@@ -431,9 +441,11 @@ function App() {
     try {
       const lastWord = chooseSecureLastWord(completion.data.candidates);
       setCompletedMnemonic(`${completion.data.normalizedPartial} ${lastWord}`);
+      concealSensitiveReveals();
       setCompletionRandomError(null);
     } catch (error) {
       setCompletedMnemonic("");
+      concealSensitiveReveals();
       setCompletionRandomError(error instanceof Error ? error.message : "Secure final-word generation failed.");
     }
   };
@@ -447,12 +459,12 @@ function App() {
   };
 
   const togglePrivateKey = (keyId: string) => {
-    setRevealedPrivateKeys((current) => {
-      const next = new Set(current);
-      if (next.has(keyId)) next.delete(keyId);
-      else next.add(keyId);
-      return next;
-    });
+    dispatchSensitiveReveal({ type: "toggle-private-key", keyId });
+  };
+
+  const togglePrivacyMode = () => {
+    setPrivacyMode((value) => !value);
+    concealSensitiveReveals();
   };
 
   const eventUnit = mode === "hex" ? "characters" : mode === "cards" ? "unique cards" : mode === "coin" ? "flips" : "rolls";
@@ -506,7 +518,7 @@ function App() {
               {darkMode ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
               <span className="hidden md:inline">{darkMode ? "Light" : "Dark"}</span>
             </Button>
-            <Button variant="quiet" size="sm" onClick={() => setPrivacyMode((value) => !value)}>
+            <Button variant="quiet" size="sm" onClick={togglePrivacyMode}>
               {privacyMode ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
               {privacyMode ? "Show private data" : "Presentation mode"}
             </Button>
@@ -538,14 +550,20 @@ function App() {
           <div className="grid w-full max-w-xl grid-cols-2 rounded-2xl border border-line bg-surface p-1.5 shadow-soft">
             <button
               type="button"
-              onClick={() => setWorkflow("create")}
+              onClick={() => {
+                setWorkflow("create");
+                concealSensitiveReveals();
+              }}
               className={cn("rounded-xl px-4 py-3 text-sm font-semibold transition", workflow === "create" ? "bg-ink text-canvas shadow-sm" : "text-muted hover:text-ink")}
             >
               Create from randomness
             </button>
             <button
               type="button"
-              onClick={() => setWorkflow("verify")}
+              onClick={() => {
+                setWorkflow("verify");
+                concealSensitiveReveals();
+              }}
               className={cn("rounded-xl px-4 py-3 text-sm font-semibold transition", workflow === "verify" ? "bg-ink text-canvas shadow-sm" : "text-muted hover:text-ink")}
             >
               Verify an existing result
@@ -567,7 +585,10 @@ function App() {
                   <button
                     key={count}
                     type="button"
-                    onClick={() => setWordCount(count as 12 | 24)}
+                    onClick={() => {
+                      setWordCount(count as 12 | 24);
+                      concealSensitiveReveals();
+                    }}
                     className={cn(
                       "rounded-lg px-3 py-2 text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                       wordCount === count ? "bg-ink text-canvas shadow-sm" : "text-muted hover:text-ink",
@@ -579,7 +600,14 @@ function App() {
               </div>
             </div>
 
-            <Tabs value={mode} onValueChange={(value) => setMode(value as EntropyMode)} className="space-y-4">
+            <Tabs
+              value={mode}
+              onValueChange={(value) => {
+                setMode(value as EntropyMode);
+                concealSensitiveReveals();
+              }}
+              className="space-y-4"
+            >
               <TabsList className="grid w-full grid-cols-4">
                 {(Object.keys(MODE_META) as EntropyMode[]).map((key) => {
                   const Icon = MODE_META[key].icon;
@@ -737,6 +765,7 @@ function App() {
                   setVerifyKind(kind);
                   setVerifyInput("");
                   setCompletedMnemonic("");
+                  concealSensitiveReveals();
                   setCompletionRandomError(null);
                   setExpectedAddress("");
                   setExpectedPublicKey("");
@@ -745,6 +774,7 @@ function App() {
                 onInputChange={(value) => {
                   setVerifyInput(value);
                   setCompletedMnemonic("");
+                  concealSensitiveReveals();
                   setCompletionRandomError(null);
                 }}
                 error={verification.error}
@@ -944,7 +974,7 @@ function App() {
                         value={passphrase}
                         onChange={(event) => {
                           setPassphrase(event.target.value);
-                          setShowSeed(false);
+                          concealSensitiveReveals();
                         }}
                         disabled={!details}
                         autoComplete="off"
@@ -960,7 +990,7 @@ function App() {
                         value={passphraseConfirmation}
                         onChange={(event) => {
                           setPassphraseConfirmation(event.target.value);
-                          setShowSeed(false);
+                          concealSensitiveReveals();
                         }}
                         disabled={!details}
                         autoComplete="off"
@@ -981,7 +1011,7 @@ function App() {
                   <div className="sensitive mt-3 min-h-10 break-all font-mono text-[10px] leading-5 text-ink/75">
                     {seedHex ? (showSeed ? seedHex : `${seedHex.slice(0, 16)}${"•".repeat(20)}${seedHex.slice(-8)}`) : "—"}
                   </div>
-                  <Button variant="ghost" size="sm" className="mt-2 w-full" disabled={!seedHex} onClick={() => setShowSeed((value) => !value)}>
+                  <Button variant="ghost" size="sm" className="mt-2 w-full" disabled={!seedHex} onClick={() => dispatchSensitiveReveal({ type: "toggle-seed" })}>
                     {showSeed ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                     {showSeed ? "Hide seed" : "Reveal seed"}
                   </Button>
@@ -1065,7 +1095,7 @@ function App() {
                   type="single"
                   collapsible
                   className="sensitive"
-                  onValueChange={() => setRevealedPrivateKeys(new Set())}
+                  onValueChange={() => dispatchSensitiveReveal({ type: "clear-private-keys" })}
                 >
                   {addresses.map((item) => (
                     <AccordionItem key={item.path} value={item.path} className="first:border-t-0">
