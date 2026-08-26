@@ -49,35 +49,35 @@ It is not a wallet. It does not connect to the Bitcoin network, query balances, 
 
 ## Development
 
-Requirements: a current Node.js release and npm.
+Requirements: Node.js 24 and npm.
 
 ```sh
-npm install
+npm ci --ignore-scripts
+npm audit signatures
+npm audit --audit-level=high
+npm rebuild esbuild
 npm run dev
 ```
 
-Run the automated verification suite and production build:
+Run the same automated checks used by CI:
 
 ```sh
 npm test
+npm run typecheck
 npm run build
-```
-
-Check installed packages for known vulnerabilities:
-
-```sh
-npm audit
+npm run test:offline-export
 ```
 
 ## Export one offline HTML file
 
 ```sh
 npm run export
+npm run test:offline-export
 ```
 
 The exported application is written to `dist/index.html`. The `dist` directory is intentionally ignored by Git; build it from the reviewed source on the machine where it will be used.
 
-After building, run `npm run test:offline-export` to verify that `dist/index.html` is the only artifact and does not load external runtime resources.
+The offline-export test verifies that `dist/index.html` is the only artifact and does not load external runtime resources. Run both commands before copying or distributing the file.
 
 For a workshop, copy only that generated HTML file to the presentation computer. For any exercise involving secrets, use disposable test vectors and a dedicated offline environment—never a funded wallet.
 
