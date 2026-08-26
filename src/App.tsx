@@ -492,7 +492,10 @@ function App() {
         details={details}
         firstAddress={addresses[0]}
         hasPassphrase={Boolean(passphrase)}
-        onBack={() => setShowBackup(false)}
+        onBack={() => {
+          setShowBackup(false);
+          concealSensitiveReveals();
+        }}
       />
     );
   }
@@ -806,7 +809,10 @@ function App() {
                   <div className="flex flex-wrap items-center gap-2">
                     {!ready && <span className="rounded-full bg-accent/10 px-2.5 py-1 text-[10px] font-bold tracking-wider text-accent">LIVE PREVIEW</span>}
                     <CopyButton value={details.mnemonic} id="mnemonic" copied={copied} onCopy={handleCopy} label="Copy words" />
-                    {ready && <Button variant="accent" size="sm" disabled={!passphraseMatches} onClick={() => setShowBackup(true)}><FileKey className="size-3.5" /> Backup sheet</Button>}
+                    {ready && <Button variant="accent" size="sm" disabled={!passphraseMatches} onClick={() => {
+                      concealSensitiveReveals();
+                      setShowBackup(true);
+                    }}><FileKey className="size-3.5" /> Backup sheet</Button>}
                   </div>
                 )}
               </div>
