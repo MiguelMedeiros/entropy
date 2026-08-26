@@ -35,7 +35,7 @@
     "@testing-library/react": "16.3.2",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
-    "@vitejs/plugin-react": "4.7.0",
+    "@vitejs/plugin-react": "5.2.0",
     "autoprefixer": "10.5.4",
     "jsdom": "30.0.1",
     "postcss": "8.5.26",
@@ -43,6 +43,6 @@
     "typescript": "5.8.3",
     "vite": "8.2.2",
     "vite-plugin-singlefile": "2.3.3",
-    "vitest": "3.2.7"
+    "vitest": "4.1.11"
   }
 }
