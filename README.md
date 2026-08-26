@@ -2,6 +2,10 @@
 
 An offline-first educational workbench for seeing physical randomness become a BIP39 mnemonic, seed, BIP84 account, and Native SegWit Bitcoin addresses.
 
+**[Open the live educational demo →](https://miguelmedeiros.github.io/entropy/)**
+
+The hosted page is the same self-contained offline export produced by the reviewed build. Load it only with disposable workshop data, then disconnect if the exercise calls for an offline environment.
+
 > [!CAUTION]
 > ## EDUCATIONAL SOFTWARE ONLY — DO NOT USE THIS PROJECT TO SECURE REAL FUNDS
 >
