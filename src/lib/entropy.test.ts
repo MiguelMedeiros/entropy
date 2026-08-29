@@ -39,15 +39,15 @@ describe("physical entropy parsing", () => {
     expect(requiredEvents("cards", 256)).toBeNull();
   });
 
-  it("accepts only a complete camera capture digest without estimating sensor entropy", () => {
-    const complete = parseEntropy("camera", "ab".repeat(32));
-    const incomplete = parseEntropy("camera", "ab".repeat(31));
+  it.each(["camera", "microphone"] as const)("accepts only a complete %s capture digest without estimating sensor entropy", (mode) => {
+    const complete = parseEntropy(mode, "ab".repeat(32));
+    const incomplete = parseEntropy(mode, "ab".repeat(31));
 
     expect(complete.events).toHaveLength(1);
     expect(complete.estimatedBits).toBe(256);
     expect(incomplete.events).toHaveLength(0);
     expect(incomplete.estimatedBits).toBe(0);
-    expect(requiredEvents("camera", 128)).toBe(1);
+    expect(requiredEvents(mode, 128)).toBe(1);
   });
 });
 
@@ -138,6 +138,20 @@ describe("entropy extraction", () => {
     expect(sourceToEntropyHex("camera", invalid, 128)).toBeNull();
     expect(canonicalInput("camera", parsed.normalized)).toBe(
       `entropy-workbench:v1|camera|${"ab".repeat(32)}`,
+    );
+  });
+
+  it("domain-separates a complete microphone digest from other sensor sources", () => {
+    const digest = "ab".repeat(32);
+    const microphone = parseEntropy("microphone", digest);
+    const camera = parseEntropy("camera", digest);
+
+    expect(sourceToEntropyHex("microphone", microphone, 256)).toMatch(/^[0-9a-f]{64}$/);
+    expect(sourceToEntropyHex("microphone", microphone, 256)).not.toBe(
+      sourceToEntropyHex("camera", camera, 256),
+    );
+    expect(canonicalInput("microphone", digest)).toBe(
+      `entropy-workbench:v1|microphone|${digest}`,
     );
   });
 });

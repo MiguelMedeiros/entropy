@@ -1,7 +1,7 @@
 import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils";
 
-export type EntropyMode = "coin" | "dice" | "cards" | "camera" | "hex";
+export type EntropyMode = "coin" | "dice" | "cards" | "camera" | "microphone" | "hex";
 
 export interface ParsedEntropy {
   events: string[];
@@ -71,7 +71,7 @@ export function parseEntropy(mode: EntropyMode, raw: string): ParsedEntropy {
     };
   }
 
-  if (mode === "camera") {
+  if (mode === "camera" || mode === "microphone") {
     const compact = raw.toLowerCase().replace(/\s+/g, "");
     const valid = [...compact].filter((char) => /[0-9a-f]/.test(char));
     const normalized = valid.join("");
@@ -115,7 +115,7 @@ export function sourceToEntropyHex(
     return digest.slice(0, targetCharacters);
   }
 
-  if (mode === "camera") {
+  if (mode === "camera" || mode === "microphone") {
     if (parsed.invalidCount > 0 || parsed.events.length !== 1 || !/^[0-9a-f]{64}$/.test(parsed.normalized)) {
       return null;
     }
@@ -179,8 +179,8 @@ export function generateSecureTranscript(
   mode: EntropyMode,
   targetBits: 128 | 256,
 ) {
-  if (mode === "camera") {
-    throw new Error("Camera entropy must be captured from a live camera stream.");
+  if (mode === "camera" || mode === "microphone") {
+    throw new Error(`${mode === "camera" ? "Camera" : "Microphone"} entropy must be captured from a live media stream.`);
   }
   if (mode === "hex") return generateSecureEntropyHex(targetBits);
 
@@ -203,7 +203,7 @@ export function generateSecureTranscript(
 }
 
 export function requiredEvents(mode: EntropyMode, targetBits: 128 | 256) {
-  if (mode === "camera") return 1;
+  if (mode === "camera" || mode === "microphone") return 1;
   if (mode === "coin") return targetBits;
   if (mode === "dice") return Math.ceil(targetBits / Math.log2(6));
   if (mode === "hex") return targetBits / 4;
