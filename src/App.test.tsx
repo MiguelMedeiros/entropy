@@ -74,3 +74,18 @@ describe("camera entropy controls", () => {
     expect(screen.getByText(/Sensor entropy is not quantifiable/)).toBeTruthy();
   });
 });
+
+describe("microphone entropy controls", () => {
+  it("keeps the microphone off until the user explicitly starts it", () => {
+    renderApp();
+
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Mic" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+
+    expect(screen.getByRole("button", { name: "Start microphone" })).toBeTruthy();
+    expect(screen.getByText(/Microphone entropy cannot be measured reliably/)).toBeTruthy();
+    expect(screen.getByText(/Sensor entropy is not quantifiable/)).toBeTruthy();
+  });
+});

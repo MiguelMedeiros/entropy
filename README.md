@@ -23,6 +23,7 @@ The hosted page is the same self-contained offline export produced by the review
 
 - Recording physical entropy from fair coin flips, six-sided dice, or cards drawn without replacement.
 - Sampling several live camera frames into a local SHA-256 capture digest without saving or uploading images.
+- Sampling nearby sound into a local SHA-256 capture digest without saving or uploading an audio recording.
 - Generating CSPRNG-backed coin flips, unbiased dice rolls, shuffled cards, or exact-size Hex for demonstrations.
 - Estimating source entropy without pretending that hashing adds randomness.
 - Converting entropy into BIP39 checksum bits, 11-bit indexes, and 12/24 recovery words.
@@ -145,13 +146,15 @@ Two matching browser tools are useful for learning, but they are not automatical
 - **Weak entropy:** hashing birthdays, quotations, keyboard mashing, repeated dice results, biased coins, or other predictable material does not make it secure.
 - **Camera uncertainty:** a 256-bit camera digest does not prove 256 bits of entropy. Static scenes, controlled lighting, image processing, virtual cameras, repeated captures, faulty sensors, or compromised hardware can make the input far more predictable than the digest length suggests.
 - **Camera permissions:** the camera starts only after an explicit button press and is stopped after capture, cancellation, or leaving the camera tab. Raw frames are downsampled and hashed in memory; only the digest remains in the app state.
+- **Microphone uncertainty:** a 256-bit microphone digest does not prove 256 bits of entropy. Silence, repeated speech, predictable tones, audio processing, virtual inputs, repeated captures, faulty sensors, or compromised hardware can make samples far more predictable than the digest length suggests.
+- **Microphone permissions:** the microphone starts only after an explicit button press and is stopped after capture, cancellation, or leaving the microphone tab. Samples are quantized and hashed in memory; only the digest remains in the app state, and no audio recording is created.
 - **Card limit:** one uniformly shuffled 52-card deck contains at most about 225.6 bits, not 256 bits.
 - **Implementation scope:** only the paths and formats listed above are supported; other wallets may use different networks, accounts, scripts, paths, languages, or extended-key versions.
 - **No persistence is not erasure:** the app does not intentionally save data, but browsers and operating systems may still retain memory, clipboard, swap, screenshots, print jobs, or crash information.
 
 ## Data behavior
 
-The application is designed without network requests, analytics, telemetry, accounts, cookies, local storage, or server-side components. All calculations happen in the browser tab. Camera frames are processed locally and are not saved or uploaded.
+The application is designed without network requests, analytics, telemetry, accounts, cookies, local storage, or server-side components. All calculations happen in the browser tab. Camera frames and microphone samples are processed locally and are not saved or uploaded.
 
 That design reduces exposure; it does **not** establish that the runtime environment or compiled file is safe.
 
