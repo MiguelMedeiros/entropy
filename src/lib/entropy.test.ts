@@ -38,6 +38,17 @@ describe("physical entropy parsing", () => {
     expect(requiredEvents("cards", 128)).not.toBeNull();
     expect(requiredEvents("cards", 256)).toBeNull();
   });
+
+  it("accepts only a complete camera capture digest without estimating sensor entropy", () => {
+    const complete = parseEntropy("camera", "ab".repeat(32));
+    const incomplete = parseEntropy("camera", "ab".repeat(31));
+
+    expect(complete.events).toHaveLength(1);
+    expect(complete.estimatedBits).toBe(256);
+    expect(incomplete.events).toHaveLength(0);
+    expect(incomplete.estimatedBits).toBe(0);
+    expect(requiredEvents("camera", 128)).toBe(1);
+  });
 });
 
 describe("entropy extraction", () => {
@@ -116,5 +127,17 @@ describe("entropy extraction", () => {
       "7f9c9e31ac8256ca2f258583df262dbc7d6f68f2a03043d5c99a4ae5a7396ce9",
     );
     expect(sourceToEntropyHex("hex", incompleteByte, 256)).toBeNull();
+  });
+
+  it("domain-separates a complete camera digest before producing BIP39 entropy", () => {
+    const parsed = parseEntropy("camera", "ab".repeat(32));
+    const invalid = parseEntropy("camera", `${"ab".repeat(32)}!`);
+
+    expect(sourceToEntropyHex("camera", parsed, 128)).toMatch(/^[0-9a-f]{32}$/);
+    expect(sourceToEntropyHex("camera", parsed, 256)).toMatch(/^[0-9a-f]{64}$/);
+    expect(sourceToEntropyHex("camera", invalid, 128)).toBeNull();
+    expect(canonicalInput("camera", parsed.normalized)).toBe(
+      `entropy-workbench:v1|camera|${"ab".repeat(32)}`,
+    );
   });
 });

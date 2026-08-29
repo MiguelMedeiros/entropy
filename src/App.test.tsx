@@ -59,3 +59,18 @@ describe("sensitive reveal transitions", () => {
     expect(backup).toHaveProperty("disabled", false);
   });
 });
+
+describe("camera entropy controls", () => {
+  it("keeps the camera off until the user explicitly starts it", () => {
+    renderApp();
+
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Camera" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+
+    expect(screen.getByRole("button", { name: "Start camera" })).toBeTruthy();
+    expect(screen.getByText(/Camera entropy cannot be measured reliably/)).toBeTruthy();
+    expect(screen.getByText(/Sensor entropy is not quantifiable/)).toBeTruthy();
+  });
+});
