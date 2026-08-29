@@ -1,7 +1,7 @@
 import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex, hexToBytes, utf8ToBytes } from "@noble/hashes/utils";
 
-export type EntropyMode = "coin" | "dice" | "cards" | "hex";
+export type EntropyMode = "coin" | "dice" | "cards" | "camera" | "hex";
 
 export interface ParsedEntropy {
   events: string[];
@@ -71,6 +71,21 @@ export function parseEntropy(mode: EntropyMode, raw: string): ParsedEntropy {
     };
   }
 
+  if (mode === "camera") {
+    const compact = raw.toLowerCase().replace(/\s+/g, "");
+    const valid = [...compact].filter((char) => /[0-9a-f]/.test(char));
+    const normalized = valid.join("");
+    const complete = compact.length === 64 && valid.length === 64;
+    return {
+      events: complete ? [normalized] : [],
+      normalized,
+      invalidCount: compact.length - valid.length,
+      duplicateCount: 0,
+      // This is the extractor-output size, not a claim about sensor entropy.
+      estimatedBits: complete ? 256 : 0,
+    };
+  }
+
   const normalized = raw.toLowerCase().replace(/\s+/g, "");
   const valid = [...normalized].filter((char) => /[0-9a-f]/.test(char));
   return {
@@ -98,6 +113,12 @@ export function sourceToEntropyHex(
     if (parsed.normalized.length % 2 !== 0) return null;
     const digest = bytesToHex(sha256(hexToBytes(parsed.normalized)));
     return digest.slice(0, targetCharacters);
+  }
+
+  if (mode === "camera") {
+    if (parsed.invalidCount > 0 || parsed.events.length !== 1 || !/^[0-9a-f]{64}$/.test(parsed.normalized)) {
+      return null;
+    }
   }
 
   const digest = bytesToHex(sha256(utf8ToBytes(extractorInput(mode, parsed.normalized))));
@@ -158,6 +179,9 @@ export function generateSecureTranscript(
   mode: EntropyMode,
   targetBits: 128 | 256,
 ) {
+  if (mode === "camera") {
+    throw new Error("Camera entropy must be captured from a live camera stream.");
+  }
   if (mode === "hex") return generateSecureEntropyHex(targetBits);
 
   if (mode === "coin") {
@@ -179,6 +203,7 @@ export function generateSecureTranscript(
 }
 
 export function requiredEvents(mode: EntropyMode, targetBits: 128 | 256) {
+  if (mode === "camera") return 1;
   if (mode === "coin") return targetBits;
   if (mode === "dice") return Math.ceil(targetBits / Math.log2(6));
   if (mode === "hex") return targetBits / 4;

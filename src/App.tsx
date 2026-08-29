@@ -1,5 +1,6 @@
 import {
   Binary,
+  Camera,
   Check,
   ChevronRight,
   CircleDot,
@@ -33,6 +34,7 @@ import { Card } from "./components/ui/card";
 import { Progress } from "./components/ui/progress";
 import { Tabs, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { BackupSheet } from "./components/backup-sheet";
+import { CameraEntropyControls } from "./components/camera-entropy";
 import { GlossaryTerm } from "./components/glossary-term";
 import { PassphraseStrengthMeter } from "./components/passphrase-strength";
 import { VerifyPanel, type VerifyKind } from "./components/verify-panel";
@@ -77,6 +79,12 @@ const MODE_META = {
     icon: Layers3,
     placeholder: "Enter cards like AS KH 10D…",
     hint: "Draw from one thoroughly shuffled 52-card deck, without replacement.",
+  },
+  camera: {
+    label: "Camera",
+    icon: Camera,
+    placeholder: "Camera capture digest appears here…",
+    hint: "Sample motion and sensor variation from several live camera frames.",
   },
   hex: {
     label: "Hex",
@@ -194,6 +202,10 @@ function EntropyControls({
     }
     onChange(raw.slice(0, -1));
   };
+
+  if (mode === "camera") {
+    return <CameraEntropyControls value={raw} onChange={onChange} />;
+  }
 
   return (
     <>
@@ -320,7 +332,7 @@ function App() {
   const [workflow, setWorkflow] = useState<"create" | "verify">("create");
   const [mode, setMode] = useState<EntropyMode>("coin");
   const [wordCount, setWordCount] = useState<12 | 24>(12);
-  const [inputs, setInputs] = useState<Record<EntropyMode, string>>({ coin: "", dice: "", cards: "", hex: "" });
+  const [inputs, setInputs] = useState<Record<EntropyMode, string>>({ coin: "", dice: "", cards: "", camera: "", hex: "" });
   const [verifyKind, setVerifyKind] = useState<VerifyKind>("hex");
   const [verifyInput, setVerifyInput] = useState("");
   const [completedMnemonic, setCompletedMnemonic] = useState("");
@@ -407,7 +419,7 @@ function App() {
   const sourceReady = parsed.estimatedBits >= targetBits && Boolean(generatedDetails);
   const ready = workflow === "create" ? sourceReady : Boolean(verification.details);
   const progress = (effectiveBits / targetBits) * 100;
-  const hasExtraEntropy = parsed.estimatedBits > targetBits;
+  const hasExtraEntropy = mode !== "camera" && parsed.estimatedBits > targetBits;
   const hexIsCondensed = mode === "hex" && hasExtraEntropy;
   const hasIncompleteHexByte = hexIsCondensed && parsed.normalized.length % 2 !== 0;
 
@@ -466,7 +478,7 @@ function App() {
     concealSensitiveReveals();
   };
 
-  const eventUnit = mode === "hex" ? "characters" : mode === "cards" ? "unique cards" : mode === "coin" ? "flips" : "rolls";
+  const eventUnit = mode === "camera" ? "capture" : mode === "hex" ? "characters" : mode === "cards" ? "unique cards" : mode === "coin" ? "flips" : "rolls";
   const remaining = needed === null ? null : Math.max(0, needed - parsed.events.length);
   const transcriptCopyLabel = mode === "dice"
     ? "Copy dice rolls"
@@ -474,7 +486,9 @@ function App() {
       ? "Copy coin flips"
       : mode === "cards"
         ? "Copy card transcript"
-        : "Copy Hex input";
+        : mode === "camera"
+          ? "Copy capture digest"
+          : "Copy Hex input";
   const automaticGenerationSummary = mode === "coin"
     ? `${targetBits} simulated fair coin flips · CSPRNG`
     : mode === "dice"
@@ -483,7 +497,9 @@ function App() {
         ? needed === null
           ? "One complete 52-card shuffle · maximum ≈225.6 bits"
           : `${needed} cards drawn from one secure shuffle`
-        : `${targetBits} cryptographically secure random bits`;
+        : mode === "camera"
+          ? "Live camera frames · locally hashed"
+          : `${targetBits} cryptographically secure random bits`;
 
   if (showBackup && details && passphraseMatches) {
     return (
@@ -544,7 +560,7 @@ function App() {
             </h1>
           </div>
           <div className="border-l-2 border-accent pl-5 text-sm leading-6 text-muted lg:mb-2">
-            Flip, roll, or draw in the physical world. This workbench makes every deterministic step afterward visible — and keeps all data on this device.
+            Flip, roll, draw, or sample a camera in the physical world. This workbench makes every deterministic step afterward visible — and keeps all data on this device.
           </div>
         </section>
 
@@ -610,7 +626,7 @@ function App() {
               }}
               className="space-y-4"
             >
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 {(Object.keys(MODE_META) as EntropyMode[]).map((key) => {
                   const Icon = MODE_META[key].icon;
                   return (
@@ -623,17 +639,19 @@ function App() {
                 })}
               </TabsList>
 
-              <div>
-                <Button variant="accent" className="mb-2 w-full" onClick={generateAutomaticEntropy}>
-                  <Sparkles className="size-4" /> Generate {MODE_META[mode].label.toLowerCase()} automatically
-                </Button>
-                <p className="text-center text-[10px] leading-4 text-muted">
-                  {automaticGenerationSummary} · generated entirely offline
-                </p>
-                <p className="mt-1 text-center text-[10px] leading-4 text-muted">
-                  Each source tab keeps its own transcript.
-                </p>
-              </div>
+              {mode !== "camera" && (
+                <div>
+                  <Button variant="accent" className="mb-2 w-full" onClick={generateAutomaticEntropy}>
+                    <Sparkles className="size-4" /> Generate {MODE_META[mode].label.toLowerCase()} automatically
+                  </Button>
+                  <p className="text-center text-[10px] leading-4 text-muted">
+                    {automaticGenerationSummary} · generated entirely offline
+                  </p>
+                  <p className="mt-1 text-center text-[10px] leading-4 text-muted">
+                    Each source tab keeps its own transcript.
+                  </p>
+                </div>
+              )}
               {randomError && <p className="rounded-lg bg-danger/[0.06] px-3 py-2 text-xs text-danger">{randomError}</p>}
 
               <div className="space-y-3">
@@ -641,7 +659,9 @@ function App() {
                 <EntropyControls mode={mode} raw={raw} onChange={updateRaw} />
                 <div className="flex items-center justify-between gap-3 px-1">
                   <span className="text-[10px] leading-4 text-muted">
-                    Copies the recorded source transcript, not the final BIP39 entropy.
+                    {mode === "camera"
+                      ? "Copies the capture digest, never a photo or raw frame."
+                      : "Copies the recorded source transcript, not the final BIP39 entropy."}
                   </span>
                   <Button
                     variant="quiet"
@@ -666,6 +686,8 @@ function App() {
                     <strong className="font-semibold text-ink">Conversion method:</strong>{" "}
                     {mode === "dice"
                       ? "Ian Coleman compatible · Dice → base 6 → SHA-256"
+                      : mode === "camera"
+                        ? "24 downsampled RGBA frames + monotonic timing → SHA-256 capture digest → domain-separated SHA-256"
                       : mode === "hex"
                         ? "Exact BIP39 Hex · oversized input is condensed with SHA-256"
                         : "Entropy Workbench v1 · source-separated SHA-256"}
@@ -684,15 +706,25 @@ function App() {
             <div className="mt-5 rounded-xl border border-line bg-surface/55 p-4">
               <div className="mb-2 flex items-end justify-between gap-3">
                 <div>
-                  <div className="text-xs font-semibold text-muted"><GlossaryTerm definition="A measure of unpredictability, expressed in bits. More genuinely random independent events make guessing the original source exponentially harder.">Estimated source entropy</GlossaryTerm></div>
-                  <div className="mt-1 font-mono text-xl font-semibold">
-                    {(hasExtraEntropy ? parsed.estimatedBits : effectiveBits).toFixed(effectiveBits < 10 ? 1 : 0)}
-                    <span className="ml-1 text-xs font-normal text-muted">
-                      {hasExtraEntropy ? "input bits" : `/ ${targetBits} bits`}
-                    </span>
-                  </div>
-                  {hasExtraEntropy && (
-                    <div className="mt-1 font-mono text-[10px] font-semibold text-success">→ {targetBits} BIP39 bits</div>
+                  {mode === "camera" ? (
+                    <>
+                      <div className="text-xs font-semibold text-muted">Camera capture</div>
+                      <div className="mt-1 font-mono text-xl font-semibold">{sourceReady ? "Digest ready" : "Not captured"}</div>
+                      <div className="mt-1 text-[10px] font-semibold text-muted">Sensor entropy is not quantifiable</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-xs font-semibold text-muted"><GlossaryTerm definition="A measure of unpredictability, expressed in bits. More genuinely random independent events make guessing the original source exponentially harder.">Estimated source entropy</GlossaryTerm></div>
+                      <div className="mt-1 font-mono text-xl font-semibold">
+                        {(hasExtraEntropy ? parsed.estimatedBits : effectiveBits).toFixed(effectiveBits < 10 ? 1 : 0)}
+                        <span className="ml-1 text-xs font-normal text-muted">
+                          {hasExtraEntropy ? "input bits" : `/ ${targetBits} bits`}
+                        </span>
+                      </div>
+                      {hasExtraEntropy && (
+                        <div className="mt-1 font-mono text-[10px] font-semibold text-success">→ {targetBits} BIP39 bits</div>
+                      )}
+                    </>
                   )}
                 </div>
                 <div className={cn("rounded-full px-2.5 py-1 text-[11px] font-bold", sourceReady ? "bg-success/10 text-success" : "bg-accent/10 text-accent")}>
@@ -702,21 +734,27 @@ function App() {
               <Progress value={progress} className={sourceReady ? "[&>div]:bg-success" : undefined} />
               <p className="mt-3 text-xs leading-5 text-muted">
                 {sourceReady
-                  ? hexIsCondensed
+                  ? mode === "camera"
+                    ? `24 camera frames were hashed locally into a 256-bit capture digest, then converted to ${targetBits} BIP39 bits. This does not prove ${targetBits} bits of real-world entropy.`
+                    : hexIsCondensed
                     ? `${parsed.estimatedBits} input bits condensed with SHA-256 to ${targetBits} BIP39 bits. Every complete byte is included.`
                     : `${parsed.events.length} ${eventUnit} recorded. You have reached the ${targetBits}-bit target.`
                   : remaining === null
                     ? `One shuffled deck tops out at ≈225.6 bits. Use 12 words, coins, or dice for a complete target.`
                     : hasIncompleteHexByte
                       ? "Add one hexadecimal character to complete the final byte."
+                    : mode === "camera"
+                      ? "Start the camera and complete one capture. No frame leaves the browser or remains in the transcript."
                       : `${remaining} more ${eventUnit} to reach the conservative target.`}
               </p>
             </div>
 
-            <div className="mt-3 flex items-center justify-between px-1 text-xs text-muted">
-              <span>At 1 trillion guesses/sec</span>
-              <span className="font-mono font-semibold text-ink">{formatCrackTime(effectiveBits)}</span>
-            </div>
+            {mode !== "camera" && (
+              <div className="mt-3 flex items-center justify-between px-1 text-xs text-muted">
+                <span>At 1 trillion guesses/sec</span>
+                <span className="font-mono font-semibold text-ink">{formatCrackTime(effectiveBits)}</span>
+              </div>
+            )}
 
             {generatedDetails && (
               <Accordion type="single" collapsible className="mt-4 rounded-xl border border-success/20 bg-success/[0.055] px-4">
@@ -757,7 +795,7 @@ function App() {
             )}
 
             <Button variant="ghost" size="sm" className="mt-4 w-full text-muted" disabled={!raw} onClick={() => updateRaw("")}>
-              <RotateCcw className="size-3.5" /> Clear this transcript
+              <RotateCcw className="size-3.5" /> {mode === "camera" ? "Clear capture digest" : "Clear this transcript"}
             </Button>
               </>
             ) : (
@@ -873,6 +911,8 @@ function App() {
                                     : verifyKind === "complete"
                                       ? "The partial phrase is normalized and every supplied word is checked against the English BIP39 list."
                                       : "Spaces and capitalization are normalized before the BIP39 checksum is validated."
+                                  : mode === "camera"
+                                    ? "Each downsampled camera frame is mixed with its monotonic capture time and hashed immediately. The raw pixels are then cleared; only the final capture digest is retained."
                                   : mode === "hex"
                                     ? hexIsCondensed
                                       ? "The hexadecimal input is normalized and decoded as raw bytes."
@@ -888,8 +928,10 @@ function App() {
                                     : details.mnemonic
                                   : mode === "hex"
                                     ? parsed.normalized
-                                    : mode === "dice"
+                                  : mode === "dice"
                                       ? `Dice transcript: ${parsed.normalized}\nExtractor input: ${extractorInput(mode, parsed.normalized)}`
+                                    : mode === "camera"
+                                      ? `Capture digest: ${parsed.normalized}\nExtractor input: ${canonicalInput(mode, parsed.normalized)}`
                                       : canonicalInput(mode, parsed.normalized)}
                               </div>
                             </div>
@@ -907,6 +949,8 @@ function App() {
                                     : verifyKind === "complete"
                                       ? "A cryptographically secure random choice supplies the remaining entropy bits. BIP39 then derives the checksum portion of the final word, and the original entropy is recovered from the completed phrase."
                                       : "The original BIP39 entropy is recovered from the validated word indexes and checksum."
+                                  : mode === "camera"
+                                    ? `A domain-separated SHA-256 hashes the 256-bit capture digest; the first ${targetBits} bits become the BIP39 entropy. The digest size is not an estimate of camera unpredictability.`
                                   : mode === "hex"
                                     ? hexIsCondensed
                                       ? `SHA-256 condenses all ${parsed.estimatedBits} input bits; the first ${targetBits} bits become the BIP39 entropy.`

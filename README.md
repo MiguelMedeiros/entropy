@@ -22,6 +22,7 @@ The hosted page is the same self-contained offline export produced by the review
 ## What this project demonstrates
 
 - Recording physical entropy from fair coin flips, six-sided dice, or cards drawn without replacement.
+- Sampling several live camera frames into a local SHA-256 capture digest without saving or uploading images.
 - Generating CSPRNG-backed coin flips, unbiased dice rolls, shuffled cards, or exact-size Hex for demonstrations.
 - Estimating source entropy without pretending that hashing adds randomness.
 - Converting entropy into BIP39 checksum bits, 11-bit indexes, and 12/24 recovery words.
@@ -142,13 +143,15 @@ Two matching browser tools are useful for learning, but they are not automatical
 - **XPUB/ZPUB privacy:** extended public keys cannot spend funds, but they reveal all addresses and transaction history for the account.
 - **Private-key display:** per-address private keys are derived in memory and can be revealed. Revealing or copying them is dangerous.
 - **Weak entropy:** hashing birthdays, quotations, keyboard mashing, repeated dice results, biased coins, or other predictable material does not make it secure.
+- **Camera uncertainty:** a 256-bit camera digest does not prove 256 bits of entropy. Static scenes, controlled lighting, image processing, virtual cameras, repeated captures, faulty sensors, or compromised hardware can make the input far more predictable than the digest length suggests.
+- **Camera permissions:** the camera starts only after an explicit button press and is stopped after capture, cancellation, or leaving the camera tab. Raw frames are downsampled and hashed in memory; only the digest remains in the app state.
 - **Card limit:** one uniformly shuffled 52-card deck contains at most about 225.6 bits, not 256 bits.
 - **Implementation scope:** only the paths and formats listed above are supported; other wallets may use different networks, accounts, scripts, paths, languages, or extended-key versions.
 - **No persistence is not erasure:** the app does not intentionally save data, but browsers and operating systems may still retain memory, clipboard, swap, screenshots, print jobs, or crash information.
 
 ## Data behavior
 
-The application is designed without network requests, analytics, telemetry, accounts, cookies, local storage, or server-side components. All calculations happen in the browser tab.
+The application is designed without network requests, analytics, telemetry, accounts, cookies, local storage, or server-side components. All calculations happen in the browser tab. Camera frames are processed locally and are not saved or uploaded.
 
 That design reduces exposure; it does **not** establish that the runtime environment or compiled file is safe.
 
