@@ -14,7 +14,7 @@
     "test:watch": "vitest src"
   },
   "dependencies": {
-    "@noble/hashes": "1.7.1",
+    "@noble/hashes": "2.4.0",
     "@radix-ui/react-accordion": "1.2.20",
     "@radix-ui/react-tabs": "1.1.21",
     "@radix-ui/react-tooltip": "1.2.7",
